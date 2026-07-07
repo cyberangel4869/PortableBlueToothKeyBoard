@@ -41,4 +41,9 @@ KeyBoard.h        //按键类，含有配置函数和中断处理函数，其中
 OLED_Driver.h     //OLED显示类，基于U8G2库，对库函数进行再次封装，便于调用
 WS2812Driver.h    //RGB灯带驱动库
 ```
+## 电路与PCB设计
+#### 电路原理图
+```cpp
+BTkeyboard_Schematic.pdf
+```
 
