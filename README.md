@@ -46,4 +46,7 @@ WS2812Driver.h    //RGB灯带驱动库
 ```cpp
 BTkeyboard_Schematic.pdf
 ```
+#### 电路PCB设计
+参见本目录下的`16键自定义键盘.epro`与`16键自定义键盘.epro2`
+* 用嘉立创专业版打开`.epro`和`.epro2`文件，‘2’表示不同版本的嘉立创专业版
 
