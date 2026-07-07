@@ -35,11 +35,13 @@
 
 ## 软件框架
 ```cpp
-main.cpp          //初始化代码，主循环
-Encoder.h         //编码器类，包含配置函数与中断处理函数
-KeyBoard.h        //按键类，含有配置函数和中断处理函数，其中中断处理函数返回按下按键键码的指针
-OLED_Driver.h     //OLED显示类，基于U8G2库，对库函数进行再次封装，便于调用
-WS2812Driver.h    //RGB灯带驱动库
+platformio.ini        //PlatformIO配置文件
+
+src/main.cpp          //初始化代码，主循环
+src/Encoder.h         //编码器类，包含配置函数与中断处理函数
+src/KeyBoard.h        //按键类，含有配置函数和中断处理函数，其中中断处理函数返回按下按键键码的指针
+src/OLED_Driver.h     //OLED显示类，基于U8G2库，对库函数进行再次封装，便于调用
+src/WS2812Driver.h    //RGB灯带驱动库
 ```
 ## 电路与PCB设计
 #### 电路原理图
