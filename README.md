@@ -1,5 +1,7 @@
 # PortableBlueToothKeyBoard
 基于ESP32S3的9键蓝牙键盘，有蓝牙和有线两种模式，可以从C口直接编程和供电，带有自动休眠功能，一段时间内无人使用就自动降低中断处理频率或进入休眠模式以节省电量。
+立创开源硬件平台地址：
+https://oshwhub.com/elecangel/project_krufaupn
 
 ## 外观
 ![outlook](outlook.jpg)
