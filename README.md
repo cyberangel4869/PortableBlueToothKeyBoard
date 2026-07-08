@@ -51,4 +51,5 @@ BTkeyboard_Schematic.pdf
 #### 电路PCB设计
 参见本目录下的`16键自定义键盘.epro`与`16键自定义键盘.epro2`
 * 用嘉立创专业版打开`.epro`和`.epro2`文件，‘2’表示不同版本的嘉立创专业版
+* 更多硬件设计与组装细节参见立创开源平台https://oshwhub.com/elecangel/project_krufaupn
 
