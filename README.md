@@ -57,3 +57,6 @@ BTkeyboard_Schematic.pdf
 * 用嘉立创专业版打开`.epro`和`.epro2`文件，‘2’表示不同版本的嘉立创专业版
 * 更多硬件设计与组装细节参见立创开源平台https://oshwhub.com/elecangel/project_krufaupn
 
+## 功能更新
+* 2026.10.7 新增了读写片上flash的功能，支持记录多组按键布局配置数据，后续将更新利用WebUI自定义按键布局的功能
+
