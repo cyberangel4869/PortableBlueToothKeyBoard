@@ -1,59 +1,55 @@
 #include <Arduino.h>
-#include "USB.h"
+#include <Preferences.h>
+#include "BoardMapMem.h"
 
-// #include "USBHIDKeyboard.h"  // 注释掉USB键盘
-// #include "USBHIDConsumerControl.h"  // 注释掉USB消费者控制
+#define USB_EN 1
+
 #include "OLED_Driver.h"
 #include "WS2812Driver.h"
 #include "KeyBoard.h"
 #include "Encoder.h"
+
+#ifdef BT_EN
 #include <BleKeyboard.h>
 #include <BLESecurity.h>
 #include <esp_sleep.h>
+#endif
 
-//#define DEBUG 1
-//#define DEBUGKEYS 1
-//#define DEBUGLOWPOWER 1
+#ifdef USB_EN
+#include "USBHIDKeyboard.h"  
+#include "USBHIDConsumerControl.h"
+#include "USB.h"
+#endif
+
+
 
 OLED_Driver oled;
 WS2812Driver led;
 Key keyboard;
 Encoder encoder;
-// USBHIDKeyboard USBkeyboard;  // 注释掉
-// USBHIDConsumerControl USBconsumer;  // 注释掉
+BoardMapMem mem;
+#ifdef USB_EN
+USBHIDKeyboard USBkeyboard;  
+USBHIDConsumerControl USBconsumer;  
+#endif
+#ifdef BT_EN
 BleKeyboard bleKeyboard("BLE Keyboard", "Maker", 100);
+#endif
 
-#define MODE_PIN 12
 
-struct KeyMap{
-    uint8_t KeyCode;
-    uint8_t FuctCode;
-};
-
-// 使用键值
-KeyMap KeyCodes[10]={
-    {0,0},
-    {0xD4,0},  // KEY_DELETE
-    {0,0},
-    {0xB0,0},  // KEY_RETURN
-    {'c',0x80}, // KEY_LEFT_CTRL_C
-    {0xDA,0},  // KEY_UP_ARROW
-    {'v',0x80}, // KEY_LEFT_CTRL_V
-    {0xD8,0},  // KEY_LEFT_ARROW
-    {0xD9,0},  // KEY_DOWN_ARROW
-    {0xD7,0}   // KEY_RIGHT_ARROW
-};
 
 int8_t mode=0;
-// bool usbMode = true;  // 注释掉模式选择
-bool bluetoothOnly = true;  // 固定为蓝牙模式
 uint32_t Cycle=0;//轮询时间，毫秒
 unsigned long LastPressTime=0;//上一次按下按键的系统时间，毫秒
+Preferences prefs;
+BoardMap* currentMap;   // 当前模式实际使用的映射
 
-#define KEY_BOARD 0
-#define VOLUME_ADJ 1
-#define SCREEN_BRICHT_ADJ 2
-#define RGB_BRIGHT_ADJ 3
+#define MODE0 0
+#define MODE1 1
+#define MODE2 2
+#define MODE3 3
+#define MODE4 4
+#define WEBUI 5
 void sendKeyPress(uint8_t keyCode, uint8_t modifier = 0);
 void sendMediaKey(uint8_t keyCode);
 void globalInit();
@@ -66,103 +62,58 @@ void setup() {
 void loop(){
     if(keyboard.pressed()){
         uint8_t KeyID = keyboard.getKeyNum();
-        LastPressTime=millis();//记录系统时间
-        Cycle=0;//轮询周期5ms
+        LastPressTime = millis();
+        Cycle = 0;
         led.clear();
-        if(KeyID==0){
-            sendKeyPress('3');
-            sendKeyPress('1');
+
+        if (KeyID < 10) {
+            sendKeyPress(currentMap->KeyCodes[KeyID].KeyCode,
+                         currentMap->KeyCodes[KeyID].FuctCode);
         }
-        else{
-        if(KeyCodes[KeyID].FuctCode == 0){
-            sendKeyPress(KeyCodes[KeyID].KeyCode);
-        } else {
-            sendKeyPress(KeyCodes[KeyID].KeyCode, KeyCodes[KeyID].FuctCode);
-        }
-    }
-        led.setPixelColor(led.num(KeyID), 0x66, 0xcc, 0xff);
         keyboard.clear();
     }
+
     if(encoder.turned()){
-        Serial0.println("encoder turned");
-        switch (mode)
-        {
-        case KEY_BOARD:
-            break;
-        case VOLUME_ADJ:
-            if(encoder.getDirection() > 0){
-                sendMediaKey(0x00);
-                encoder.clearAll();
-            } else {
-                sendMediaKey(0x00);
-                encoder.clearAll();
-            }
-            break;
-        case SCREEN_BRICHT_ADJ:
-            encoder.clearAll();
-            break;
-        case RGB_BRIGHT_ADJ:
-            uint8_t brit = led.getBrightness();            
-            if(encoder.getDirection()>0){
-                brit=brit+10;
-            }
-            else{
-                brit=brit-10;
-            }
-            if(brit<=255&&brit>=10){
-                led.begin((uint8_t)brit);
-            }
-            encoder.clearAll();
-            delay(50);
-            break;
-        }
-    }
-    if(encoder.pressed()){
-        switch (mode)
-        {
-            case KEY_BOARD:
-                mode = VOLUME_ADJ;
-                oled.clear();
-                oled.printCenter(20, "Volume");
-                delay(50);
-                encoder.clearPressed();
-                break;
-            case VOLUME_ADJ:
-                mode = SCREEN_BRICHT_ADJ;
-                oled.clear();
-                oled.printCenter(12, "Screen");
-                oled.printCenterNoClear(25, "Brightness");
-                delay(50);
-                encoder.clearPressed();
-                break;
-            case SCREEN_BRICHT_ADJ:
-                mode = RGB_BRIGHT_ADJ;
-                oled.clear();
-                oled.printCenter(20, "RGB brightness");
-                delay(50);
-                encoder.clearPressed();
-                break;
-            case RGB_BRIGHT_ADJ:
-                mode = KEY_BOARD;
-                oled.clear();
-                // 显示蓝牙连接状态
-                if (bleKeyboard.isConnected()) {
-                    oled.printCenter(20, "BT Connected");
-                } else {
-                    oled.printCenter(20, "BT Waiting");
-                }
-                delay(50);
-                encoder.clearPressed();
-                break;
-        }
         
     }
-    //一分钟内没有按下新按键，降低轮询频率
+
+    if(encoder.pressed()){
+        uint8_t nextMode;
+        switch (mode){
+            case MODE0: nextMode = MODE1; break;
+            case MODE1: nextMode = MODE2; break;
+            case MODE2: nextMode = MODE3; break;
+            case MODE3: nextMode = MODE4; break;
+            case MODE4: nextMode = WEBUI; break;
+            case WEBUI: nextMode = MODE0; break;
+            default:    nextMode = MODE0; break;
+        }
+
+        if (nextMode == WEBUI) {
+            oled.clear();
+            oled.printCenter(10, "Web UI");
+            oled.printCenter(20, "SSID:Keyboard");
+            oled.printCenter(30, "PW:88888888");
+            mode = nextMode;
+        } 
+        else {
+            mem.Load(nextMode);
+            led.setBrightness(mem.GetRGBBrightness());
+            oled.setBrightness(mem.GetScreenBrightness());
+            oled.clear();
+            oled.printCenter(20,mem.GetName());
+            mode = nextMode;
+        }
+
+        delay(50);
+        encoder.clearPressed();
+    }
+
+    #ifdef BT_EN
     if(millis()-LastPressTime>60000){
         led.clear();
-        Cycle=500;//0.5秒轮询一次
+        Cycle=500;
     }
-    //10分钟内没有新的按键按下，进入休眠模式
     if(millis()-LastPressTime>600000){
         oled.clear();
         led.clear();
@@ -170,11 +121,13 @@ void loop(){
         delay(500);
         keyboard.beginDeepSleep();
     }
-    delay(Cycle);//轮询周期
+    delay(Cycle);
+    #endif
 }
 
 
 void sendKeyPress(uint8_t keyCode, uint8_t modifier) {
+    #ifdef BT_EN
     if (bleKeyboard.isConnected()) {
         if (modifier == 0) {
             bleKeyboard.press(keyCode);
@@ -185,25 +138,42 @@ void sendKeyPress(uint8_t keyCode, uint8_t modifier) {
             bleKeyboard.releaseAll();
         }     
     }
+    #endif
+    #ifdef USB_EN
+    if(modifier==0){
+        USBkeyboard.press(keyCode);
+        USBkeyboard.releaseAll();
+    } else {
+        USBkeyboard.press(modifier);
+        USBkeyboard.press(keyCode);
+        USBkeyboard.releaseAll();
+    }
+    #endif
 }
 
 void sendMediaKey(uint8_t keyCode) {
-    // 只保留蓝牙模式
+    #ifdef BT_EN
     if (bleKeyboard.isConnected()) {
         // 蓝牙模式下的多媒体键处理
         bleKeyboard.write(keyCode);
     }
+    #endif
+    #ifdef USB_EN
+    USBconsumer.press(keyCode);
+    USBconsumer.release();
+    #endif
 }
 
 void globalInit(){
     LastPressTime=millis();
     oled.begin();
     keyboard.beginNormal();
-    led.begin(100);
+    led.begin(50);
     encoder.begin();
-    bleKeyboard.begin();
     oled.clearBuffer();
     oled.setFont(u8g2_font_7x14_tr);
+    #ifdef BT_EN
+    bleKeyboard.begin();
     while(!bleKeyboard.isConnected()){
         led.fillColor(0xff0000);
         oled.printCenter(20,"Connecting...");
@@ -216,5 +186,12 @@ void globalInit(){
     oled.printCenter(20,"BT Keyboard");
     delay(1000);
     led.clear();
+    #endif
+    #ifdef USB_EN
+    USB.begin();
+    USBkeyboard.begin();
+    USBconsumer.begin();
+    oled.printCenter(20,"USB mode 0");
+    #endif
 }
 
